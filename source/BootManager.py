@@ -85,14 +85,14 @@ class log:
         except Exception, e:
             self.LogEntry( str(e) )
             return
-    
+
     def LogEntry( self, str, inc_newline= 1, display_screen= 1 ):
         now=time.strftime(log.format, time.localtime())
         if self.OutputFile:
             self.OutputFile.write( now+str )
         if display_screen:
             sys.stdout.write( now+str )
-            
+
         if inc_newline:
             if display_screen:
                 sys.stdout.write( "\n" )
@@ -108,7 +108,7 @@ class log:
         prints)
         """
         self.LogEntry( str, 0, 1 )
-    
+
     # bm log uploading is available back again, as of nodeconfig-5.0-2
     def Upload( self, extra_file=None ):
         """
@@ -118,7 +118,7 @@ class log:
             self.OutputFile.flush()
 
             self.LogEntry( "Uploading logs to %s" % self.VARS['UPLOAD_LOG_SCRIPT'] )
-            
+
             self.OutputFile.close()
             self.OutputFile= None
 
@@ -131,7 +131,7 @@ class log:
                                        GetVars = None, PostVars = None,
                                        DoSSL = True, DoCertCheck = True,
                                        FormData = ["log=@" + self.OutputFilePath,
-                                                   "hostname=" + hostname, 
+                                                   "hostname=" + hostname,
                                                    "type=bm.log"])
             except:
                 # new pycurl
@@ -143,7 +143,7 @@ class log:
                                                    ("hostname",hostname),
                                                    ("type","bm.log")])
         if extra_file is not None:
-            # NOTE: for code-reuse, evoke the bash function 'upload_logs'; 
+            # NOTE: for code-reuse, evoke the bash function 'upload_logs';
             # by adding --login, bash reads .bash_profile before execution.
             # Also, never fail, since this is an optional feature.
             utils.sysexec_noerr( """bash --login -c "upload_logs %s" """ % extra_file, self)
@@ -160,7 +160,7 @@ class BootManager:
                      'safeboot':None,
                      'disabled':None,
                      }
-    
+
     def __init__(self, log, forceState):
         # override machine's current state from the command line
         self.forceState = forceState
@@ -176,7 +176,7 @@ class BootManager:
             self.VARS= log.VARS
         else:
             return
-             
+
         # not sure what the current PATH is set to, replace it with what
         # we know will work with all the boot cds
         os.environ['PATH']= string.join(BIN_PATH,":")
@@ -219,14 +219,14 @@ class BootManager:
             # then finally chain boots.
 
             # starting the fallback/debug ssh daemon for safety:
-            # if the node install somehow hangs, or if it simply takes ages, 
+            # if the node install somehow hangs, or if it simply takes ages,
             # we can still enter and investigate
             try:
                 StartDebug.Run(self.VARS, self.LOG, last_resort = False)
             except:
                 pass
 
-            InstallInit.Run( self.VARS, self.LOG )                    
+            InstallInit.Run( self.VARS, self.LOG )
             ret = ValidateNodeInstall.Run( self.VARS, self.LOG )
             if ret == 1:
                 WriteModprobeConfig.Run( self.VARS, self.LOG )
@@ -246,7 +246,7 @@ class BootManager:
         def _reinstallRun():
 
             # starting the fallback/debug ssh daemon for safety:
-            # if the node install somehow hangs, or if it simply takes ages, 
+            # if the node install somehow hangs, or if it simply takes ages,
             # we can still enter and investigate
             try:
                 StartDebug.Run(self.VARS, self.LOG, last_resort = False)
@@ -262,18 +262,19 @@ class BootManager:
                 raise BootManagerException, "Hardware requirements not met."
 
             # runinstaller
-            InstallInit.Run( self.VARS, self.LOG )                    
-            InstallPartitionDisks.Run( self.VARS, self.LOG )            
-            InstallBootstrapFS.Run( self.VARS, self.LOG )            
-            InstallWriteConfig.Run( self.VARS, self.LOG )
+            InstallInit.Run( self.VARS, self.LOG )
+            InstallPartitionDisks.Run( self.VARS, self.LOG )
+            InstallBootstrapFS.Run( self.VARS, self.LOG )
+            #InstallWriteConfig.Run( self.VARS, self.LOG )
             InstallUninitHardware.Run( self.VARS, self.LOG )
-            self.VARS['BOOT_STATE']= 'boot'
+            self.VARS['BOOT_STATE']= 'reinstall'  # Do not reset boot_state.
             self.VARS['STATE_CHANGE_NOTIFY']= 1
             self.VARS['STATE_CHANGE_NOTIFY_MESSAGE']= \
                  notify_messages.MSG_INSTALL_FINISHED
-            UpdateBootStateWithPLC.Run( self.VARS, self.LOG )
-            _bootRun()
-            
+            #UpdateBootStateWithPLC.Run( self.VARS, self.LOG )
+            #WriteNetworkConfig.Run( self.VARS, self.LOG )
+            ChainBootMLabUpdate.Run( self.VARS, self.LOG )
+
         def _installRun():
             # implements the new install logic, which will first check
             # with the user whether it is ok to install on this
@@ -347,18 +348,18 @@ class BootManager:
                 traceback.print_exc()
 
         return success
-            
-            
+
+
 def main(argv):
 
     import utils
     utils.prompt_for_breakpoint_mode()
 
 #    utils.breakpoint ("Entering BootManager::main")
-    
+
     # set to 1 if error occurred
     error= 0
-    
+
     # all output goes through this class so we can save it and post
     # the data back to PlanetLab central
     LOG= log( BM_NODE_LOG )
@@ -381,11 +382,11 @@ def main(argv):
     except:
         traceback.print_exc(file=LOG.OutputFile)
         traceback.print_exc()
-        
+
     if error:
         LOG.LogEntry( "BootManager finished at: %s" % \
                       time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.gmtime()) )
-        LOG.Upload()
+        #LOG.Upload()
         return error
 
     try:
@@ -406,11 +407,11 @@ def main(argv):
 
     LOG.LogEntry( "BootManager finished at: %s" % \
                   time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.gmtime()) )
-    LOG.Upload()
+    #LOG.Upload()
 
     return error
 
-    
+
 if __name__ == "__main__":
     error = main(sys.argv)
     sys.exit(error)

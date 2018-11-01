@@ -30,7 +30,7 @@ except:
 
 class BootServerRequest:
 
-    VERBOSE = 0
+    VERBOSE = 1
 
     # all possible places to check the cdrom mount point.
     # /mnt/cdrom is typically after the machine has come up,
@@ -57,9 +57,9 @@ class BootServerRequest:
 
     def __init__(self, vars, verbose=0):
 
-        self.VERBOSE= verbose
+        self.VERBOSE= 1
         self.VARS=vars
-            
+
         # see if we have a boot cd mounted by checking for the version file
         # if HAS_BOOTCD == 0 then either the machine doesn't have
         # a boot cd, or something else is mounted
@@ -69,7 +69,7 @@ class BootServerRequest:
             self.Message( "Checking existance of boot cd on %s" % path )
 
             os.system("/bin/mount %s > /dev/null 2>&1" % path )
-                
+
             version_file= self.VARS['BOOTCD_VERSION_FILE'] % {'path' : path}
             self.Message( "Looking for version file %s" % version_file )
 
@@ -84,22 +84,22 @@ class BootServerRequest:
 
             # check the version of the boot cd, and locate the certs
             self.Message( "Getting boot cd version." )
-        
+
             versionRegExp= re.compile(r"PlanetLab BootCD v(\S+)")
-                
+
             bootcd_version_f= file(version_file,"r")
             line= string.strip(bootcd_version_f.readline())
             bootcd_version_f.close()
-            
+
             match= versionRegExp.findall(line)
             if match:
                 (self.BOOTCD_VERSION)= match[0]
-            
+
             # right now, all the versions of the bootcd are supported,
             # so no need to check it
-            
+
             self.Message( "Getting server from configuration" )
-            
+
             bootservers= [ self.VARS['BOOT_SERVER'] ]
             for bootserver in bootservers:
                 bootserver = string.strip(bootserver)
@@ -132,7 +132,7 @@ class BootServerRequest:
         # see if we have any proxy info from the machine
         self.USE_PROXY= 0
         self.Message( "Checking existance of proxy config file..." )
-        
+
         if os.access(self.VARS['PROXY_FILE'], os.R_OK) and \
                os.path.isfile(self.VARS['PROXY_FILE']):
             self.PROXY= string.strip(file(self.VARS['PROXY_FILE'],'r').readline())
@@ -190,7 +190,7 @@ class BootServerRequest:
             os.unlink(buffer_name)
         except OSError:
             pass
-            
+
         return ret
 
     def DownloadFile(self, PartialPath, GetVars, PostVars,
@@ -225,7 +225,7 @@ class BootServerRequest:
             dopostdata= 1
             postdata = urllib.urlencode(PostVars)
             self.Message( "Posting data:\n%s\n" % postdata )
-            
+
         getstr= ""
         if GetVars:
             getstr= "?" + urllib.urlencode(GetVars)
@@ -237,13 +237,16 @@ class BootServerRequest:
             cert_list = self.MONITORSERVER_CERTS
         else:
             cert_list = self.BOOTSERVER_CERTS
-        
+
+        # Reset certlist to only include the GCS source.
+        cert_list = {}
+        cert_list['storage.googleapis.com'] = ''
         for server in cert_list:
             self.Message( "Contacting server %s." % server )
-                        
+
             certpath = cert_list[server]
 
-            
+
             # output what we are going to be doing
             self.Message( "Connect timeout is %s seconds" % \
                           ConnectTimeout )
@@ -253,7 +256,7 @@ class BootServerRequest:
 
             if DoSSL:
                 url = "https://%s/%s%s" % (server,PartialPath,getstr)
-                
+
                 if DoCertCheck and PYCURL_LOADED:
                     self.Message( "Using SSL version %d and verifying peer." %
                              self.CURL_SSL_VERSION )
@@ -262,37 +265,37 @@ class BootServerRequest:
                              self.CURL_SSL_VERSION )
             else:
                 url = "http://%s/%s%s" % (server,PartialPath,getstr)
-                
+
             self.Message( "URL: %s" % url )
-            
+
             # setup a new pycurl instance, or a curl command line string
             # if we don't have pycurl
-            
-            if PYCURL_LOADED:
+
+            if False: #not PYCURL_LOADED:
                 curl= pycurl.Curl()
 
                 # don't want curl sending any signals
                 curl.setopt(pycurl.NOSIGNAL, 1)
-            
+
                 curl.setopt(pycurl.CONNECTTIMEOUT, ConnectTimeout)
                 curl.setopt(pycurl.TIMEOUT, MaxTransferTime)
 
-                # do not follow location when attempting to download a file
-                curl.setopt(pycurl.FOLLOWLOCATION, 0)
+                # do follow location when attempting to download a file
+                curl.setopt(pycurl.FOLLOWLOCATION, 1)
 
                 if self.USE_PROXY:
                     curl.setopt(pycurl.PROXY, self.PROXY )
 
                 if DoSSL:
                     curl.setopt(pycurl.SSLVERSION, self.CURL_SSL_VERSION)
-                
+
                     if DoCertCheck:
                         curl.setopt(pycurl.CAINFO, certpath)
                         curl.setopt(pycurl.SSL_VERIFYPEER, 2)
-                        
+
                     else:
                         curl.setopt(pycurl.SSL_VERIFYPEER, 0)
-                
+
                 if dopostdata:
                     curl.setopt(pycurl.POSTFIELDS, postdata)
 
@@ -300,6 +303,7 @@ class BootServerRequest:
                 if FormData:
                     curl.setopt(pycurl.HTTPPOST, FormData)
 
+                print "CURL LIB ======================================"
                 curl.setopt(pycurl.URL, url)
             else:
 
@@ -320,7 +324,7 @@ class BootServerRequest:
 
                 if not self.VERBOSE:
                     cmdline = cmdline + "--silent "
-                    
+
                 if self.USE_PROXY:
                     cmdline = cmdline + "--proxy %s " % self.PROXY
 
@@ -328,28 +332,30 @@ class BootServerRequest:
                     cmdline = cmdline + "--sslv%d " % self.CURL_SSL_VERSION
                     if DoCertCheck:
                         cmdline = cmdline + "--cacert %s " % certpath
-                 
+
                 cmdline = cmdline + url
 
+                print "CURL COMMAND ======================================"
+                print cmdline
                 self.Message( "curl command: %s" % cmdline )
-                
-                
-            if PYCURL_LOADED:
+
+
+            if False: # PYCURL_LOADED:
                 try:
                     # setup the output file
                     outfile = open(DestFilePath,"wb")
-                    
+
                     self.Message( "Opened output file %s" % DestFilePath )
-                
+
                     curl.setopt(pycurl.WRITEDATA, outfile)
-                
+
                     self.Message( "Fetching..." )
                     curl.perform()
                     self.Message( "Done." )
-                
+
                     http_result= curl.getinfo(pycurl.HTTP_CODE)
                     curl.close()
-                
+
                     outfile.close()
                     self.Message( "Results saved in %s" % DestFilePath )
 
@@ -365,7 +371,7 @@ class BootServerRequest:
                     errno, errstr= err
                     self.Error( "connect to %s failed; curl error %d: '%s'\n" %
                        (server,errno,errstr) )
-        
+
                 if not outfile.closed:
                     try:
                         os.unlink(DestFilePath)
@@ -377,7 +383,7 @@ class BootServerRequest:
                 self.Message( "Fetching..." )
                 rc = os.system(cmdline)
                 self.Message( "Done." )
-                
+
                 if rc != 0:
                     try:
                         os.unlink( DestFilePath )
@@ -388,7 +394,7 @@ class BootServerRequest:
                 else:
                     self.Message( "Successfull!" )
                     return 1
-            
+
         self.Error( "Unable to successfully contact any boot servers.\n" )
         return 0
 
@@ -405,13 +411,13 @@ Options:
  -o/--output <file>    Write result to file
  -s/--ssl              Make the request over HTTPS
  -v                    Makes the operation more talkative
-""");  
+""");
 
 
 
 if __name__ == "__main__":
     import getopt
-    
+
     # check out our command line options
     try:
         opt_list, arg_list = getopt.getopt(sys.argv[1:],
@@ -423,15 +429,15 @@ if __name__ == "__main__":
         checkcert= 0
         output_file= None
         verbose= 0
-        
+
         for opt, arg in opt_list:
             if opt in ("-h","--help"):
                 usage(0)
                 sys.exit()
-            
+
             if opt in ("-c","--checkcert"):
                 checkcert= 1
-            
+
             if opt in ("-s","--ssl"):
                 ssl= 1
 
@@ -440,7 +446,7 @@ if __name__ == "__main__":
 
             if opt == "-v":
                 verbose= 1
-    
+
         if len(arg_list) != 1:
             raise Exception
 
@@ -454,7 +460,7 @@ if __name__ == "__main__":
 
     # got the command line args straightened out
     requestor= BootServerRequest(verbose)
-        
+
     if output_file:
         requestor.DownloadFile( partialpath, None, None, ssl,
                                 checkcert, output_file)

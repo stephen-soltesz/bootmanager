@@ -62,7 +62,7 @@ SWAP_SIZE=1G
 
 # in raw disk mode, the size of /vservers
 # if unset or -1, use the entire first disk
-VSERVERS_SIZE=-1
+VSERVERS_SIZE=14G
 
 
 # whether or not to skip hardware requirement check

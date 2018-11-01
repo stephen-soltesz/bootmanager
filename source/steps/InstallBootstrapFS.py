@@ -10,7 +10,7 @@
 import os, sys, string
 import popen2
 import shutil
-import traceback 
+import traceback
 import time
 
 from Exceptions import *
@@ -22,13 +22,13 @@ import BootAPI
 def Run( vars, log ):
     """
     Download core + extensions bootstrapfs tarballs and install on the hard drive
-    
+
     Expect the following variables from the store:
     SYSIMG_PATH          the path where the system image will be mounted
     PARTITIONS           dictionary of generic part. types (root/swap)
                          and their associated devices.
     NODE_ID              the id of this machine
-    
+
     Sets the following variables:
     TEMP_BOOTCD_PATH     where the boot cd is remounted in the temp
                          path
@@ -67,10 +67,10 @@ def Run( vars, log ):
         val= PARTITIONS["vservers"]
     except KeyError, part:
         log.write( "Missing partition in PARTITIONS: %s\n" % part )
-        return 0   
+        return 0
 
     bs_request= BootServerRequest.BootServerRequest(vars)
-    
+
     log.write( "turning on swap space\n" )
     utils.sysexec( "swapon %s" % PARTITIONS["swap"], log )
 
@@ -95,7 +95,7 @@ def Run( vars, log ):
         plain = node_flavour['plain']
     except:
         raise BootManagerException ("Could not call GetNodeFlavour - need PLCAPI-5.0")
-    
+
     # the 'plain' option is for tests mostly
     if plain:
         download_suffix=".tar"
@@ -111,35 +111,37 @@ def Run( vars, log ):
         log.write("Installing only core software\n")
     else:
         log.write("Requested extensions %r\n" % extensions)
-    
+
     bootstrapfs_names = [ nodefamily ] + extensions
+
+    prefix = 'epoxy-mlab-sandbox'
 
     for name in bootstrapfs_names:
         tarball = "bootstrapfs-%s%s"%(name,download_suffix)
-        source_file= "/boot/%s" % (tarball)
+        source_file= prefix+"/boot/%s" % (tarball)
         dest_file= "%s/%s" % (SYSIMG_PATH, tarball)
 
-        source_hash_file= "/boot/%s.sha1sum" % (tarball)
+        source_hash_file= prefix+"/boot/%s.sha1sum" % (tarball)
         dest_hash_file= "%s/%s.sha1sum" % (SYSIMG_PATH, tarball)
 
         # 30 is the connect timeout, 14400 is the max transfer time in
         # seconds (4 hours)
         log.write( "downloading %s\n" % source_file )
         result = bs_request.DownloadFile( source_file, None, None,
-                                         1, 1, dest_file,
+                                         0, 0, dest_file,
                                          30, 14400)
 
         if result:
             # Download SHA1 checksum file
             log.write( "downloading sha1sum for %s\n"%source_file)
             result = bs_request.DownloadFile( source_hash_file, None, None,
-                                         1, 1, dest_hash_file,
+                                         0, 0, dest_hash_file,
                                          30, 14400)
- 
+
             log.write( "verifying sha1sum for %s\n"%source_file)
             if not utils.check_file_hash(dest_file, dest_hash_file):
                 raise BootManagerException, "FATAL: SHA1 checksum does not match between %s and %s" % (source_file, source_hash_file)
-                
+
             log.write( "extracting %s in %s\n" % (dest_file,SYSIMG_PATH) )
             result = utils.sysexec( "tar -C %s -xpf %s %s" % (SYSIMG_PATH,dest_file,uncompress_option), log )
             log.write( "Done\n")
@@ -172,7 +174,7 @@ def Run( vars, log ):
                     SYSIMG_PATH + "/usr/boot/cacert.pem")
         file(SYSIMG_PATH + "/usr/boot/boot_server", "w").write(boot_server)
         shutil.copy("/usr/bootme/pubring.gpg", SYSIMG_PATH + "/usr/boot/pubring.gpg")
-        
+
     # For backward compatibility
     if os.path.exists("/usr/bootme"):
         utils.makedirs(SYSIMG_PATH + "/mnt/cdrom")
