@@ -211,16 +211,26 @@ def Run( vars, log ):
     except IOError:
         log.write( "Couldn't read /proc/modules, continuing.\n" )
 
+    try:
+        INTERFACE_SETTINGS= vars['INTERFACE_SETTINGS']
+    except KeyError, e:
+        raise BootManagerException, "No interface settings found in vars."
 
-    if os.path.exists('%s/project.txt' % SYSIMG_PATH):
-        project = open('%s/project.txt', SYSIMG_PATH).read()
-    else:
+    # Determine M-Lab GCP target project based on machine fqdn.
+    hostname = INTERFACE_SETTINGS.get('hostname', '')
+    site = INTERFACE_SETTINGS.get('domainname', '').split('.')[0]
+    if (not hostname or not site or
+        len(site) != 5 or len(hostname) != 5 or site[4] == 't'):
+        project = 'mlab-sandbox'
+    elif hostname[4] == '4':
         project = 'mlab-staging'
+    elif hostname[4] in ['1', '2', '3']:
+        project = 'mlab-oti'
+    else:
+        # Default case for anything really weird.
+        project = 'mlab-sandbox'
 
     ARGS = (
-        # Attempt to disable IPv6 autoconf.
-       "autoconf=0 "
-
         # Disable interface naming by the kernel. Preserves the use of `eth0`, etc.
         "net.ifnames=0 "
 
@@ -239,11 +249,6 @@ def Run( vars, log ):
         # updaterom.sh after boot.
        "epoxy.stage3=https://storage.googleapis.com/epoxy-%(project)s/stage3_mlxupdate/stage3post.json "
     )
-
-    try:
-        INTERFACE_SETTINGS= vars['INTERFACE_SETTINGS']
-    except KeyError, e:
-        raise BootManagerException, "No interface settings found in vars."
 
     INTERFACE_SETTINGS['project'] = project
     kargs = ARGS % INTERFACE_SETTINGS
