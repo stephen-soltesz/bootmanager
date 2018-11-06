@@ -230,34 +230,41 @@ def Run( vars, log ):
         # Default case for anything really weird.
         project = 'mlab-sandbox'
 
-    ARGS = (
+    ARGS = [
         # Disable interface naming by the kernel. Preserves the use of `eth0`, etc.
-        "net.ifnames=0 "
+        "net.ifnames=0",
 
         # Canonical epoxy network configuration.
-        "epoxy.hostname=%(hostname)s.%(domainname)s "
-        "epoxy.interface=eth0 "
-        "epoxy.ipv4=%(ip)s/26,%(gateway)s,8.8.8.8,8.8.4.4 "
+        "epoxy.hostname=%(hostname)s.%(domainname)s",
+        "epoxy.interface=eth0",
+        "epoxy.ipv4=%(ip)s/26,%(gateway)s,8.8.8.8,8.8.4.4",
 
-        # Epoxy server & project.
-        "epoxy.project=%(project)s "
+        # ePoxy server & project.
+        "epoxy.project=%(project)s",
+
+        # ePoxy stage1 URL.
+        "epoxy.stage1=https://boot-api-dot-%(project)s.appspot.com/v1/boot/%(hostname)s.%(domainname)s/stage1.json",
+
         # Note: Only encode the base URL. The download script detects the device
         # model and constructs the full path ROM based on the system hostname.
-        "epoxy.mrom=https://storage.googleapis.com/epoxy-%(project)s/stage1_mlxrom/latest "
-
-        # Note: Add a epoxy.stage3 action so the mlxupdate can automatically run
-        # updaterom.sh after boot.
-       "epoxy.stage3=https://storage.googleapis.com/epoxy-%(project)s/stage3_mlxupdate/stage3post.json "
-    )
+        # TODO: move to a later stage config.
+        #"epoxy.mrom=https://storage.googleapis.com/epoxy-%(project)s/stage1_mlxrom/latest",
+    ]
 
     INTERFACE_SETTINGS['project'] = project
-    kargs = ARGS % INTERFACE_SETTINGS
+    cmdline = ' '.join(ARGS)
+    kargs = cmdline % INTERFACE_SETTINGS
+
+    fd = open("/tmp/cmdline", 'w')
+    fd.write(kargs)
+    fd.close()
 
     utils.sysexec_noerr( 'hwclock --systohc --utc ', log )
-    utils.breakpoint ("Before kexec")
+    utils.breakpoint ("Before epoxy_client")
     try:
         #log.write( 'kexec --force --initrd=/tmp/initrd --command-line="%s" /tmp/kernel' % kargs )
-        utils.sysexec( 'kexec --force --initrd=/tmp/initrd --command-line="%s" /tmp/kernel' % kargs, log)
+        # utils.sysexec( 'kexec --force --initrd=/tmp/initrd --command-line="%s" /tmp/kernel' % kargs, log)
+        utils.sysexec( '/tmp/epoxy_client -cmdline /tmp/cmdline -action epoxy.stage1', log)
         #utils.sysexec( 'kexec --force --command-line="%s" /tmp/kernel' % kargs, log)
 
     except BootManagerException, e:
