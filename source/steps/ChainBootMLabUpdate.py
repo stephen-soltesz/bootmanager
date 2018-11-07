@@ -256,7 +256,7 @@ def Run( vars, log ):
     utils.sysexec_noerr( 'hwclock --systohc --utc ', log )
     utils.breakpoint ("Before epoxy_client")
     try:
-        utils.sysexec( '/tmp/epoxy_client -cmdline /tmp/cmdline -action epoxy.stage1', log)
+        utils.sysexec( '/tmp/epoxy_client -cmdline /tmp/cmdline -action epoxy.stage1 -extra-kargs', log)
 
     except BootManagerException, e:
         # if kexec fails, we've shut the machine down to a point where nothing
