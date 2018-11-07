@@ -108,9 +108,8 @@ def Run( vars, log ):
         log.write( "Unable to write out /etc/planetlab/session, continuing anyway\n" )
 
 
-    log.write( "Copying kernel and initrd for booting.\n" )
-    utils.sysexec( "cp %s/boot/kernel-boot /tmp/kernel" % (SYSIMG_PATH), log )
-    utils.sysexec( "cp %s/boot/initrd-boot /tmp/initrd" % (SYSIMG_PATH), log )
+    log.write( "Copying epoxy_client for booting.\n" )
+    utils.sysexec( "cp %s/epoxy_client /tmp/epoxy_client" % (SYSIMG_PATH), log )
 
     BootAPI.save(vars)
 
@@ -244,11 +243,6 @@ def Run( vars, log ):
 
         # ePoxy stage1 URL.
         "epoxy.stage1=https://boot-api-dot-%(project)s.appspot.com/v1/boot/%(hostname)s.%(domainname)s/stage1.json",
-
-        # Note: Only encode the base URL. The download script detects the device
-        # model and constructs the full path ROM based on the system hostname.
-        # TODO: move to a later stage config.
-        #"epoxy.mrom=https://storage.googleapis.com/epoxy-%(project)s/stage1_mlxrom/latest",
     ]
 
     INTERFACE_SETTINGS['project'] = project
@@ -262,10 +256,7 @@ def Run( vars, log ):
     utils.sysexec_noerr( 'hwclock --systohc --utc ', log )
     utils.breakpoint ("Before epoxy_client")
     try:
-        #log.write( 'kexec --force --initrd=/tmp/initrd --command-line="%s" /tmp/kernel' % kargs )
-        # utils.sysexec( 'kexec --force --initrd=/tmp/initrd --command-line="%s" /tmp/kernel' % kargs, log)
         utils.sysexec( '/tmp/epoxy_client -cmdline /tmp/cmdline -action epoxy.stage1', log)
-        #utils.sysexec( 'kexec --force --command-line="%s" /tmp/kernel' % kargs, log)
 
     except BootManagerException, e:
         # if kexec fails, we've shut the machine down to a point where nothing
