@@ -265,14 +265,15 @@ class BootManager:
             InstallInit.Run( self.VARS, self.LOG )                    
             InstallPartitionDisks.Run( self.VARS, self.LOG )            
             InstallBootstrapFS.Run( self.VARS, self.LOG )            
-            InstallWriteConfig.Run( self.VARS, self.LOG )
+            # InstallWriteConfig.Run( self.VARS, self.LOG )
             InstallUninitHardware.Run( self.VARS, self.LOG )
-            self.VARS['BOOT_STATE']= 'boot'
+            self.VARS['BOOT_STATE']= 'reinstall'  # Preserve boot state.
             self.VARS['STATE_CHANGE_NOTIFY']= 1
             self.VARS['STATE_CHANGE_NOTIFY_MESSAGE']= \
                  notify_messages.MSG_INSTALL_FINISHED
-            UpdateBootStateWithPLC.Run( self.VARS, self.LOG )
-            _bootRun()
+            # TODO: uncomment.
+            #UpdateBootStateWithPLC.Run( self.VARS, self.LOG )
+            ChainBootNode.Run( self.VARS, self.LOG )
             
         def _installRun():
             # implements the new install logic, which will first check
@@ -385,7 +386,7 @@ def main(argv):
     if error:
         LOG.LogEntry( "BootManager finished at: %s" % \
                       time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.gmtime()) )
-        LOG.Upload()
+        #LOG.Upload()
         return error
 
     try:
@@ -406,7 +407,7 @@ def main(argv):
 
     LOG.LogEntry( "BootManager finished at: %s" % \
                   time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.gmtime()) )
-    LOG.Upload()
+    #LOG.Upload()
 
     return error
 
