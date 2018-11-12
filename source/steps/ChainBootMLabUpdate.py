@@ -109,7 +109,7 @@ def Run( vars, log ):
 
 
     log.write( "Copying epoxy_client for booting.\n" )
-    utils.sysexec( "cp %s/epoxy_client /tmp/epoxy_client" % (SYSIMG_PATH), log )
+    utils.sysexec( "cp --preserve=mode %s/epoxy_client /tmp/epoxy_client" % (SYSIMG_PATH), log )
 
     BootAPI.save(vars)
 
@@ -142,7 +142,7 @@ def Run( vars, log ):
     # there are a few buggy drivers that don't disable their hardware
     # correctly unless they are first unloaded.
 
-    utils.sysexec_noerr( "ifconfig eth0 down", log )
+    #utils.sysexec_noerr( "ifconfig eth0 down", log )
 
     utils.sysexec_noerr( "killall dhclient", log )
 
@@ -151,7 +151,7 @@ def Run( vars, log ):
 
     # modules that should not get unloaded
     # unloading cpqphp causes a kernel panic
-    blacklist = [ "floppy", "cpqphp", "i82875p_edac", "mptspi"]
+    blacklist = [ "floppy", "cpqphp", "i82875p_edac", "mptspi", "mlx_en", "mlx_core"]
     try:
         modules= file("/tmp/loadedmodules","r")
 
@@ -229,6 +229,8 @@ def Run( vars, log ):
         # Default case for anything really weird.
         project = 'mlab-sandbox'
 
+    # TODO: force sandbox project for testing.
+    project = 'mlab-sandbox'
     ARGS = [
         # Disable interface naming by the kernel. Preserves the use of `eth0`, etc.
         "net.ifnames=0",
@@ -237,6 +239,7 @@ def Run( vars, log ):
         "epoxy.hostname=%(hostname)s.%(domainname)s",
         "epoxy.interface=eth0",
         "epoxy.ipv4=%(ip)s/26,%(gateway)s,8.8.8.8,8.8.4.4",
+        "epoxy.ip=%(ip)s::%(gateway)s:255.255.255.192:%(hostname)s.%(domainname)s:eth0::8.8.8.8",
 
         # ePoxy server & project.
         "epoxy.project=%(project)s",
@@ -256,7 +259,7 @@ def Run( vars, log ):
     utils.sysexec_noerr( 'hwclock --systohc --utc ', log )
     utils.breakpoint ("Before epoxy_client")
     try:
-        utils.sysexec( '/tmp/epoxy_client -cmdline /tmp/cmdline -action epoxy.stage1 -extra-kargs', log)
+        utils.sysexec( '/tmp/epoxy_client -cmdline /tmp/cmdline -action epoxy.stage1 -add-kargs', log)
 
     except BootManagerException, e:
         # if kexec fails, we've shut the machine down to a point where nothing
