@@ -107,58 +107,15 @@ def Run( vars, log ):
     except IOError, e:
         log.write( "Unable to write out /etc/planetlab/session, continuing anyway\n" )
 
-    # update configuration files
-    log.write( "Updating configuration files.\n" )
-    try:
-        cmd = "/etc/init.d/conf_files start --noscripts"
-        utils.sysexec_chroot( SYSIMG_PATH, cmd, log )
-    except IOError, e:
-        log.write("conf_files failed with \n %s" % e)
 
-    # update node packages
-    log.write( "Running node update.\n" )
-    if os.path.exists( SYSIMG_PATH + "/usr/bin/NodeUpdate.py" ):
-        cmd = "/usr/bin/NodeUpdate.py start noreboot"
-    else:
-        # for backwards compatibility
-        cmd = "/usr/local/planetlab/bin/NodeUpdate.py start noreboot"
-    utils.sysexec_chroot( SYSIMG_PATH, cmd, log )
-
-    # Re-generate initrd right before kexec call
-    MakeInitrd.Run( vars, log )
-
-    # the following step should be done by NM
-    UpdateNodeConfiguration.Run( vars, log )
-
-    log.write( "Updating ssh public host key with PLC.\n" )
-    ssh_host_key= ""
-    try:
-        ssh_host_key_file= file("%s/etc/ssh/ssh_host_rsa_key.pub"%SYSIMG_PATH,"r")
-        ssh_host_key= ssh_host_key_file.read().strip()
-        ssh_host_key_file.close()
-        ssh_host_key_file= None
-    except IOError, e:
-        pass
-
-    update_vals= {}
-    update_vals['ssh_rsa_key']= ssh_host_key
-    BootAPI.call_api_function( vars, "BootUpdateNode", (update_vals,) )
-
-
-    # get the kernel version
-    option = ''
-    if NODE_MODEL_OPTIONS & ModelOptions.SMP:
-        option = 'smp'
-
-    log.write( "Copying kernel and initrd for booting.\n" )
-    utils.sysexec( "cp %s/boot/kernel-boot%s /tmp/kernel" % (SYSIMG_PATH,option), log )
-    utils.sysexec( "cp %s/boot/initrd-boot%s /tmp/initrd" % (SYSIMG_PATH,option), log )
+    log.write( "Copying epoxy_client for booting.\n" )
+    utils.sysexec( "cp --preserve=mode %s/epoxy_client /tmp/epoxy_client" % (SYSIMG_PATH), log )
 
     BootAPI.save(vars)
 
     log.write( "Unmounting disks.\n" )
     utils.sysexec( "umount %s/vservers" % SYSIMG_PATH, log )
-    utils.sysexec( "umount %s/proc" % SYSIMG_PATH, log )
+    utils.sysexec_noerr( "umount %s/proc" % SYSIMG_PATH, log )
     utils.sysexec_noerr( "umount %s/dev" % SYSIMG_PATH, log )
     utils.sysexec_noerr( "umount %s/sys" % SYSIMG_PATH, log )
     utils.sysexec( "umount %s" % SYSIMG_PATH, log )
@@ -168,12 +125,12 @@ def Run( vars, log ):
     vars['ROOT_MOUNTED']= 0
 
     # Change runlevel to 'boot' prior to kexec.
-    StopRunlevelAgent.Run( vars, log )
+    # StopRunlevelAgent.Run( vars, log )
 
     log.write( "Unloading modules and chain booting to new kernel.\n" )
 
     # further use of log after Upload will only output to screen
-    log.Upload("/root/.bash_eternal_history")
+    # log.Upload("/root/.bash_eternal_history")
 
     # regardless of whether kexec works or not, we need to stop trying to
     # run anything
@@ -184,20 +141,21 @@ def Run( vars, log ):
     # to get kexec to work correctly. Even on 3.x cds (2.6 kernel),
     # there are a few buggy drivers that don't disable their hardware
     # correctly unless they are first unloaded.
-    
-    utils.sysexec_noerr( "ifconfig eth0 down", log )
+
+    # NOTE: preserve network connectivity for epoxy_client.
+    # utils.sysexec_noerr( "ifconfig eth0 down", log )
 
     utils.sysexec_noerr( "killall dhclient", log )
-        
+
     utils.sysexec_noerr( "umount -a -r -t ext2,ext3", log )
     utils.sysexec_noerr( "modprobe -r lvm-mod", log )
-    
+
     # modules that should not get unloaded
     # unloading cpqphp causes a kernel panic
-    blacklist = [ "floppy", "cpqphp", "i82875p_edac", "mptspi"]
+    blacklist = [ "floppy", "cpqphp", "i82875p_edac", "mptspi", "mlx_en", "mlx_core"]
     try:
         modules= file("/tmp/loadedmodules","r")
-        
+
         for line in modules:
             module= string.strip(line)
             if module in blacklist :
@@ -253,26 +211,55 @@ def Run( vars, log ):
     except IOError:
         log.write( "Couldn't read /proc/modules, continuing.\n" )
 
-
-    kargs = "root=%s ramdisk_size=8192" % PARTITIONS["mapper-root"]
-    if NODE_MODEL_OPTIONS & ModelOptions.SMP:
-        kargs = kargs + " " + "acpi=off"
     try:
-        kargsfb = open("/kargs.txt","r")
-        moreargs = kargsfb.readline()
-        kargsfb.close()
-        moreargs = moreargs.strip()
-        log.write( 'Parsed in "%s" kexec args from /kargs.txt\n' % moreargs )
-        kargs = kargs + " " + moreargs
-    except IOError:
-        # /kargs.txt does not exist, which is fine. Just kexec with default
-        # kargs, which is ramdisk_size=8192
-        pass 
+        INTERFACE_SETTINGS= vars['INTERFACE_SETTINGS']
+    except KeyError, e:
+        raise BootManagerException, "No interface settings found in vars."
+
+    # Determine M-Lab GCP target project based on machine fqdn.
+    hostname = INTERFACE_SETTINGS.get('hostname', '')
+    site = INTERFACE_SETTINGS.get('domainname', '').split('.')[0]
+    if (not hostname or not site or
+        len(site) != 5 or len(hostname) != 5 or site[4] == 't'):
+        project = 'mlab-sandbox'
+    elif hostname[4] == '4':
+        project = 'mlab-staging'
+    elif hostname[4] in ['1', '2', '3']:
+        project = 'mlab-oti'
+    else:
+        # Default case for anything really weird.
+        project = 'mlab-sandbox'
+
+    ARGS = [
+        # Disable interface naming by the kernel. Preserves the use of `eth0`, etc.
+        "net.ifnames=0",
+
+        # Canonical epoxy network configuration.
+        "epoxy.hostname=%(hostname)s.%(domainname)s",
+        "epoxy.interface=eth0",
+        "epoxy.ipv4=%(ip)s/26,%(gateway)s,8.8.8.8,8.8.4.4",
+        "epoxy.ip=%(ip)s::%(gateway)s:255.255.255.192:%(hostname)s.%(domainname)s:eth0::8.8.8.8",
+
+        # ePoxy server & project.
+        "epoxy.project=%(project)s",
+
+        # ePoxy stage1 URL.
+        "epoxy.stage1=https://boot-api-dot-%(project)s.appspot.com/v1/boot/%(hostname)s.%(domainname)s/stage1.json",
+    ]
+
+    INTERFACE_SETTINGS['project'] = project
+    cmdline = ' '.join(ARGS)
+    kargs = cmdline % INTERFACE_SETTINGS
+
+    fd = open("/tmp/cmdline", 'w')
+    fd.write(kargs)
+    fd.close()
 
     utils.sysexec_noerr( 'hwclock --systohc --utc ', log )
-    utils.breakpoint ("Before kexec");
+    utils.breakpoint ("Before epoxy_client")
     try:
-        utils.sysexec( 'kexec --force --initrd=/tmp/initrd --append="%s" /tmp/kernel' % kargs, log)
+        utils.sysexec( '/tmp/epoxy_client -cmdline /tmp/cmdline -action epoxy.stage1 -add-kargs', log)
+
     except BootManagerException, e:
         # if kexec fails, we've shut the machine down to a point where nothing
         # can run usefully anymore (network down, all modules unloaded, file
