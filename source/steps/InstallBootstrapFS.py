@@ -112,7 +112,8 @@ def Run( vars, log ):
     else:
         log.write("Requested extensions %r\n" % extensions)
     
-    bootstrapfs_names = [ nodefamily ] + extensions
+    # NOTE: force the possible bootstrapfs names to a single candidate.
+    bootstrapfs_names = ['MeasurementLabUpdate']
 
     for name in bootstrapfs_names:
         tarball = "bootstrapfs-%s%s"%(name,download_suffix)
@@ -183,7 +184,8 @@ def Run( vars, log ):
     utils.sysexec("gpg --homedir=/root --export --armor" \
                   " --no-default-keyring --keyring %s/usr/boot/pubring.gpg" \
                   " >%s/etc/pki/rpm-gpg/RPM-GPG-KEY-planetlab" % (SYSIMG_PATH, SYSIMG_PATH), log)
-    utils.sysexec_chroot(SYSIMG_PATH, "rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-planetlab", log)
+    # NOTE: there is no 'rpm' in the modified bootstrapfs.
+    # utils.sysexec_chroot(SYSIMG_PATH, "rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-planetlab", log)
 
     # keep a log on the installed hdd
     stamp=file(SYSIMG_PATH + "/bm-install.txt",'w')
