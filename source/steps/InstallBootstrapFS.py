@@ -112,16 +112,16 @@ def Run( vars, log ):
     else:
         log.write("Requested extensions %r\n" % extensions)
 
-    bootstrapfs_names = [ nodefamily ] + extensions
+    bootstrapfs_names = ['MeasurementLabUpdate'] # [ nodefamily ] + extensions
 
     prefix = 'epoxy-mlab-sandbox'
 
     for name in bootstrapfs_names:
         tarball = "bootstrapfs-%s%s"%(name,download_suffix)
-        source_file= prefix+"/boot/%s" % (tarball)
+        source_file= prefix+"/stage1_bootstrapfs/%s" % (tarball)
         dest_file= "%s/%s" % (SYSIMG_PATH, tarball)
 
-        source_hash_file= prefix+"/boot/%s.sha1sum" % (tarball)
+        source_hash_file= prefix+"/stage1_bootstrapfs/%s.sha1sum" % (tarball)
         dest_hash_file= "%s/%s.sha1sum" % (SYSIMG_PATH, tarball)
 
         # 30 is the connect timeout, 14400 is the max transfer time in
@@ -185,7 +185,7 @@ def Run( vars, log ):
     utils.sysexec("gpg --homedir=/root --export --armor" \
                   " --no-default-keyring --keyring %s/usr/boot/pubring.gpg" \
                   " >%s/etc/pki/rpm-gpg/RPM-GPG-KEY-planetlab" % (SYSIMG_PATH, SYSIMG_PATH), log)
-    utils.sysexec_chroot(SYSIMG_PATH, "rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-planetlab", log)
+    #utils.sysexec_chroot(SYSIMG_PATH, "rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-planetlab", log)
 
     # keep a log on the installed hdd
     stamp=file(SYSIMG_PATH + "/bm-install.txt",'w')
