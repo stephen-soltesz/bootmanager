@@ -271,8 +271,7 @@ class BootManager:
             self.VARS['STATE_CHANGE_NOTIFY']= 1
             self.VARS['STATE_CHANGE_NOTIFY_MESSAGE']= \
                  notify_messages.MSG_INSTALL_FINISHED
-            # TODO: uncomment.
-            #UpdateBootStateWithPLC.Run( self.VARS, self.LOG )
+            UpdateBootStateWithPLC.Run( self.VARS, self.LOG )
             ChainBootNode.Run( self.VARS, self.LOG )
             
         def _installRun():
@@ -386,7 +385,7 @@ def main(argv):
     if error:
         LOG.LogEntry( "BootManager finished at: %s" % \
                       time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.gmtime()) )
-        #LOG.Upload()
+        LOG.Upload()
         return error
 
     try:
@@ -407,7 +406,7 @@ def main(argv):
 
     LOG.LogEntry( "BootManager finished at: %s" % \
                   time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.gmtime()) )
-    #LOG.Upload()
+    LOG.Upload()
 
     return error
 
