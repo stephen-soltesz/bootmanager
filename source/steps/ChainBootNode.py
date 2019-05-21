@@ -244,7 +244,7 @@ def Run( vars, log ):
         "epoxy.project=%(project)s",
 
         # ePoxy stage1 URL.
-        "epoxy.stage1=https://boot-api-dot-%(project)s.appspot.com/v1/boot/%(hostname)s.%(domainname)s/stage1.json",
+        "epoxy.stage1=https://epoxy-boot-api.%(project)s.measurementlab.net/v1/boot/%(hostname)s.%(domainname)s/stage1.json",
     ]
 
     INTERFACE_SETTINGS['project'] = project
